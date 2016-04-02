@@ -13,9 +13,11 @@ public class SpaceController : MonoBehaviour
 	public float slowDownSpeed = 100f;
 	public float maxVelocity = 2000f;
 
+	public Transform body;
+	public Transform camFixedPoint;
 	public Text textVelocity;
 
-	Rigidbody rb;
+	private Rigidbody rb;
 
 	//The currently highlighted object
 	private GameObject currentObject;
@@ -44,7 +46,7 @@ public class SpaceController : MonoBehaviour
 
 	void Awake ()
 	{
-		rb = GetComponent<Rigidbody> ();
+		rb = body.GetComponent<Rigidbody> ();
 	}
 
 	// Use this for initialization
@@ -57,16 +59,17 @@ public class SpaceController : MonoBehaviour
 	void FixedUpdate ()
 	{
 //		HighlightObjects ();
-
 		HandleInput ();
 	}
+
+	Vector3 mousePos = Vector3.zero;
 
 	void HandleInput ()
 	{
 		if (textVelocity != null) {
 			textVelocity.text = "" + Mathf.Round (rb.velocity.sqrMagnitude);
 		}
-		var force = transform.forward * Time.deltaTime;
+		var force = body.forward * Time.deltaTime;
 
 		if (isMobileControl) {
 			if (Input.touchCount == 0) {
@@ -93,30 +96,32 @@ public class SpaceController : MonoBehaviour
 				}
 			}
 		}
-		Vector3 mousePos = Vector3.zero;
+		var isMousePresent = false;
 		if (Input.touchCount >= 1) {
 			mousePos = Input.GetTouch (0).position;
+			isMousePresent = true;
 			if (rb.velocity.sqrMagnitude < maxVelocity) {
 				rb.AddForce (forwardSpeed * force);
 			}
 		} 
 		if (Input.mousePresent && Input.GetMouseButton (0)) {
+			isMousePresent = true;
 			mousePos = Input.mousePosition;
 		}
-		if (mousePos != Vector3.zero) {
-			var dist = Vector3.Distance (lastMousePosition, mousePos);
-//			Debug.Log (dist);
-			if (dist > 50f || lastMousePosition == Vector3.zero) {
-				lastMousePosition = mousePos;
-			}
-			lastMousePosition = Vector3.Slerp (lastMousePosition, mousePos, Time.deltaTime * 0.05f);
-			mousePos = Camera.main.ScreenToViewportPoint (lastMousePosition);
-			mousePos = new Vector3 (-1f * (mousePos.y - 0.5f), mousePos.x - 0.5f, 0f);
-			transform.Rotate (mousePos * rotationSpeed * Time.deltaTime);
+		if (!isMousePresent) {
+			mousePos = Vector3.zero;
 		}
+		if (mousePos != Vector3.zero) {
+			mousePos = Camera.main.ScreenToViewportPoint (mousePos);
+			mousePos = new Vector3 (-1f * (mousePos.y - 0.5f), mousePos.x - 0.5f, 0f);
+			var newRot = mousePos * rotationSpeed * Time.deltaTime;
+			rb.MoveRotation (rb.rotation * Quaternion.Euler (newRot));
+		}
+		var newDir = Vector3.RotateTowards (Camera.main.transform.forward, (body.position - Camera.main.transform.position), 2f * Time.deltaTime, 0f);
+//		Debug.DrawRay (Camera.main.transform.position, newDir, Color.red);
+		Camera.main.transform.rotation = Quaternion.LookRotation (newDir);
+		Camera.main.transform.position = Vector3.Slerp (Camera.main.transform.position, camFixedPoint.position, Time.deltaTime * 10f);
 	}
-
-	Vector3 lastMousePosition = Vector3.zero;
 
 	void HighlightObjects ()
 	{
